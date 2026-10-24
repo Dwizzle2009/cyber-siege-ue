@@ -1,0 +1,13 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0.0",
+  "FriendlyName": "Aeon SDK",
+  "Description": "Achievements, leaderboards, entitlements, presence and in-game purchases on the Aeon console. No-op in the editor and on other platforms.",
+  "Category": "Online Platform",
+  "CreatedBy": "Spawnd",
+  "CanContainContent": false,
+  "Modules": [
+    { "Name": "AeonSDK", "Type": "Runtime", "LoadingPhase": "Default", "PlatformAllowList": ["Linux", "Win64", "Mac"] }
+  ]
+}
