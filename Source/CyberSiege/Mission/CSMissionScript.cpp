@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "AeonSDKSubsystem.h"
 #include "CyberSiege.h"
+#include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"

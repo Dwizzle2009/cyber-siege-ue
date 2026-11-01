@@ -12,6 +12,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -78,7 +79,7 @@ void ACSHUD::DrawHUD()
         const float f = P->GetHealthNormalized();
         DrawRect(f > 0.35f ? Teal : Red, bx, by, bw * f, bh);
 
-        const FString Ammo = P->bReloading ? TEXT("RELOADING") : FString::Printf(TEXT("%02d  /  %03d"), P->AmmoInMag, P->AmmoReserve);
+        const FString Ammo = P->bReloading ? FString(TEXT("RELOADING")) : FString::Printf(TEXT("%02d  /  %03d"), P->AmmoInMag, P->AmmoReserve);
         float tw = 0, th = 0; GetTextSize(Ammo, tw, th, Big, 1.2f * S);
         DrawText(Ammo, P->AmmoInMag == 0 && !P->bReloading ? Red : White, W - 40.f * S - tw, H - 84.f * S, Big, 1.2f * S);
     }
@@ -193,7 +194,7 @@ void ACSHUD::DrawAeonLink(float W, float S, UFont* Small)
 {
     if (UAeonSDKSubsystem* Aeon = GetGameInstance()->GetSubsystem<UAeonSDKSubsystem>())
     {
-        const FString Link = Aeon->IsOnAeon() ? TEXT("AEON  LINK  ONLINE") : TEXT("AEON  LINK  OFFLINE");
+        const FString Link = Aeon->IsOnAeon() ? FString(TEXT("AEON  LINK  ONLINE")) : FString(TEXT("AEON  LINK  OFFLINE"));
         float tw = 0, th = 0; GetTextSize(Link, tw, th, Small, 1.0f * S);
         DrawText(Link, Aeon->IsOnAeon() ? Teal : Mute, W - 40.f * S - tw, 34.f * S, Small, 1.0f * S);
     }

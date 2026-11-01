@@ -78,7 +78,6 @@ void ACSWaveDirector::SpawnOne()
     else if (Spawned >= W.Riflemen + W.Gunners) T = ECSEnemyType::Heavy;         // heavies last: the breaking point
 
     ACSSpawnPoint* P = WavePoints[FMath::RandHelper(WavePoints.Num())];
-    FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
     FTransform X = P->GetActorTransform(); X.AddToTranslation(FVector(FMath::FRandRange(-120.f, 120.f), FMath::FRandRange(-120.f, 120.f), 96.f));
     ACSEnemy* E = GetWorld()->SpawnActorDeferred<ACSEnemy>(EnemyClass, X, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
     if (!E) { LeftToSpawn--; return; }
@@ -110,7 +109,8 @@ void ACSWaveDirector::Tick(float)
         if (APawn* P = UGameplayStatics::GetPlayerPawn(this, 0)) Friends.Add(P);
         for (TActorIterator<ACSSquadMate> It(GetWorld()); It; ++It) if (!It->IsDown()) Friends.Add(*It);
         TSet<FName> Seen;
-        for (ACSSpawnPoint* P : WavePoints)
+        const TArray<ACSSpawnPoint*> Points = WavePoints;   // copy: FireEvent below can re-enter OnMissionEvent -> CollectPoints -> WavePoints.Reset()
+        for (ACSSpawnPoint* P : Points)
         {
             if (Seen.Contains(P->Approach)) continue; Seen.Add(P->Approach);
             bool bCovered = false;

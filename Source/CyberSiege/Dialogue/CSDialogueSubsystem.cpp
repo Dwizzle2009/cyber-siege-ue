@@ -4,6 +4,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 
 void UCSDialogueSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {

@@ -4,10 +4,13 @@
 #include "CyberSiege.h"
 #include "Squad/CSSquadMate.h"
 #include "EngineUtils.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 
 static const TCHAR* kCheckpointSlot = TEXT("checkpoint");
 
