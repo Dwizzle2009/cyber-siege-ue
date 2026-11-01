@@ -110,7 +110,7 @@ void ACSPlayerCharacter::BuildInputMapping()
 
     // Look: mouse is a delta, stick is a rate (scaled by DeltaTime in the handler)
     { FEnhancedActionKeyMapping& K = Mapping->MapKey(IA_LookMouse, EKeys::Mouse2D);         K.Modifiers.Add(Negate(false, true)); }
-    { FEnhancedActionKeyMapping& K = Mapping->MapKey(IA_LookStick, EKeys::Gamepad_Right2D); K.Modifiers.Add(Negate(false, true)); }
+    Mapping->MapKey(IA_LookStick, EKeys::Gamepad_Right2D);   // no Y negate: the pad already reports stick-up as look-up on Linux (0.2.2 looked down)
 
     // Actions
     Mapping->MapKey(IA_Fire,   EKeys::LeftMouseButton);
