@@ -12,6 +12,7 @@
 				"Engine",
 				"EnhancedInput",
 				"AIModule",
+				"NavigationSystem",
 				"HTTP"
 			]
 		}

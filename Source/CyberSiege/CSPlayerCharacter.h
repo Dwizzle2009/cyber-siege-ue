@@ -10,6 +10,9 @@ class USceneComponent;
 class UInputAction;
 class UInputMappingContext;
 class ACSProjectile;
+class ACSSquadMate;
+class ACSBreachWall;
+class ACSRescuee;
 
 /**
  * First-person player. Every input is an Enhanced Input action built in code
@@ -49,6 +52,20 @@ public:
     bool  bReloading = false;
     bool  bDead = false;
     float GetHealthNormalized() const { return MaxHealth > 0 ? Health / MaxHealth : 0.f; }
+    bool  bLensUp = false;
+    bool  bInteracting = false;
+    /** What the crosshair is on right now, refreshed every tick: a ground point for commands, a wall, a downed mate, a rescuee. */
+    FVector AimPoint = FVector::ZeroVector; bool bAimValid = false;
+    TWeakObjectPtr<ACSBreachWall> AimWall;
+    TWeakObjectPtr<ACSSquadMate>  AimDownedMate;
+    TWeakObjectPtr<AActor>        AimTalkTarget;
+    float InteractHeld = 0.f;
+    /** The one prompt the HUD shows for the thing under the crosshair ("Hold  [down]", "Breach  [right]", "Revive Bell  hold [Y]"). */
+    FText ContextPrompt;
+    /** Health regenerates after RegenDelay without damage (the slice has no medkits; Bell is the medic). */
+    UPROPERTY(EditAnywhere, Category="Combat") float RegenDelay = 4.f;
+    UPROPERTY(EditAnywhere, Category="Combat") float RegenPerSecond = 18.f;
+    double LastDamageTime = -100.0;
 
 protected:
     UPROPERTY(VisibleAnywhere) UCameraComponent* FirstPersonCamera;
@@ -65,6 +82,12 @@ protected:
     UPROPERTY() UInputAction* IA_Jump = nullptr;
     UPROPERTY() UInputAction* IA_Sprint = nullptr;
     UPROPERTY() UInputAction* IA_Dodge = nullptr;
+    UPROPERTY() UInputAction* IA_Lens = nullptr;       // hold: AEGIS overlay
+    UPROPERTY() UInputAction* IA_CmdHold = nullptr;    // squad: hold where I'm aiming
+    UPROPERTY() UInputAction* IA_CmdMove = nullptr;    // squad: move to where I'm aiming
+    UPROPERTY() UInputAction* IA_CmdBreach = nullptr;  // Mercer: breach the wall I'm aiming at
+    UPROPERTY() UInputAction* IA_CmdFollow = nullptr;  // squad: on me
+    UPROPERTY() UInputAction* IA_Interact = nullptr;   // revive / talk / confirm (hold)
 
     void BuildInputMapping();
 
@@ -78,9 +101,19 @@ protected:
     void OnSprintStart(const FInputActionValue& V);
     void OnSprintStop(const FInputActionValue& V);
     void OnDodge(const FInputActionValue& V);
+    void OnLensStart(const FInputActionValue& V);
+    void OnLensStop(const FInputActionValue& V);
+    void OnCmdHold(const FInputActionValue& V);
+    void OnCmdMove(const FInputActionValue& V);
+    void OnCmdBreach(const FInputActionValue& V);
+    void OnCmdFollow(const FInputActionValue& V);
+    void OnInteractStart(const FInputActionValue& V);
+    void OnInteractStop(const FInputActionValue& V);
 
     void FinishReload();
     void Die();
+    void UpdateAim();
+    void OrderSquad(TFunctionRef<void(ACSSquadMate*)> Fn, FName Only = NAME_None);
 
     double LastFireTime = -1.0;
     double LastDodgeTime = -10.0;

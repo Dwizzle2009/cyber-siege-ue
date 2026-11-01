@@ -13,7 +13,9 @@ public:
     ACSGameMode();
     virtual void BeginPlay() override;
 
-    void RegisterEnemyKill(AActor* Enemy, int32 Points);
+    void RegisterEnemyKill(AActor* Enemy, int32 Points, AController* Killer = nullptr);
+    /** True when a mission director is in the level: waves come from it, not from the arena loop. */
+    bool IsMissionMode() const { return bMissionMode; }
     void OnPlayerDied();
     void RequestRestart();
 
@@ -29,6 +31,7 @@ public:
     UPROPERTY(EditAnywhere, Category="Waves") float TimeBetweenSpawns = 0.85f;
 
 private:
+    bool  bMissionMode = false;
     int32 EnemiesRemainingToSpawn = 0;
     int32 EnemiesAlive = 0;
     FTimerHandle SpawnTimer, NextWaveTimer, StatusTimer;

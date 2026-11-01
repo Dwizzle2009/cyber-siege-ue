@@ -2,6 +2,14 @@
 #include "CSProjectile.h"
 #include "CSGameMode.h"
 #include "CyberSiege.h"
+#include "Mission/CSMissionDirector.h"
+#include "Squad/CSSquadMate.h"
+#include "Squad/CSBreachWall.h"
+#include "Squad/CSRescuee.h"
+#include "Dialogue/CSDialogueSubsystem.h"
+#include "Interact/CSTalkPoint.h"
+#include "CollisionQueryParams.h"
+#include "Engine/World.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -70,6 +78,48 @@ void ACSPlayerCharacter::BeginPlay()
 void ACSPlayerCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (bDead) return;
+    UpdateAim();
+
+    // Regen: no pickups in the slice; stay out of fire and you come back.
+    if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastDamageTime > RegenDelay) Health = FMath::Min(MaxHealth, Health + RegenPerSecond * DeltaSeconds);
+
+    // Holding interact on a downed mate revives them; on a talk point, talks; on a pending confirm, confirms.
+    if (bInteracting)
+    {
+        InteractHeld += DeltaSeconds;
+        if (ACSSquadMate* M = AimDownedMate.Get()) M->ReviveTick(DeltaSeconds);
+        else if (ACSMissionDirector* D = ACSMissionDirector::Get(this); D && D->ConfirmPending() && InteractHeld >= 0.6f) { D->Confirm(); bInteracting = false; }
+        else if (ACSTalkPoint* T = Cast<ACSTalkPoint>(AimTalkTarget.Get()); T && InteractHeld >= 0.2f) { T->Talk(this); bInteracting = false; }
+    }
+}
+
+void ACSPlayerCharacter::UpdateAim()
+{
+    bAimValid = false; AimWall = nullptr; AimDownedMate = nullptr; AimTalkTarget = nullptr; ContextPrompt = FText::GetEmpty();
+    const FVector From = FirstPersonCamera->GetComponentLocation();
+    const FVector Dir = GetControlRotation().Vector();
+    FCollisionQueryParams Q(SCENE_QUERY_STAT(PlayerAim), false, this);
+    FHitResult H;
+    if (!GetWorld()->LineTraceSingleByChannel(H, From, From + Dir * 4000.f, ECC_Visibility, Q)) return;
+    AimPoint = H.ImpactPoint; bAimValid = true;
+    AActor* A = H.GetActor(); if (!A) return;
+
+    ACSMissionDirector* D = ACSMissionDirector::Get(this);
+    if (D && D->ConfirmPending()) { ContextPrompt = NSLOCTEXT("CS", "Confirm", "Hold  [Y]  to confirm"); return; }
+
+    if (ACSBreachWall* W = Cast<ACSBreachWall>(A); W && !W->IsBreached() && H.Distance < 900.f) { AimWall = W; ContextPrompt = W->IsArmed() ? NSLOCTEXT("CS", "Breaching", "Stand clear") : NSLOCTEXT("CS", "Breach", "Breach  [D-pad right]"); return; }
+    if (ACSSquadMate* M = Cast<ACSSquadMate>(A); M && M->IsDown() && H.Distance < 260.f) { AimDownedMate = M; ContextPrompt = FText::Format(NSLOCTEXT("CS", "Revive", "Revive {0}  hold [Y]"), M->DisplayName); return; }
+    if (ACSTalkPoint* T = Cast<ACSTalkPoint>(A); T && H.Distance < 320.f && T->CanTalk()) { AimTalkTarget = T; ContextPrompt = FText::Format(NSLOCTEXT("CS", "Talk", "Talk to {0}  [Y]"), T->DisplayName); return; }
+    // the ground: a command target
+    if (H.ImpactNormal.Z > 0.6f && H.Distance > 150.f) ContextPrompt = NSLOCTEXT("CS", "Cmd", "Hold  [D-pad down]     Move  [D-pad up]");
+}
+
+void ACSPlayerCharacter::OrderSquad(TFunctionRef<void(ACSSquadMate*)> Fn, FName Only)
+{
+    ACSMissionDirector* D = ACSMissionDirector::Get(this); if (!D) return;
+    for (ACSSquadMate* M : D->Squad())
+        if (M && !M->IsDown() && M->GetOrder() != ECSSquadOrder::Scripted && (Only.IsNone() || M->Callsign == Only)) Fn(M);
 }
 
 // ------------------------------------------------------------------------------------
@@ -93,6 +143,12 @@ void ACSPlayerCharacter::BuildInputMapping()
     IA_Jump      = MakeAction(this, TEXT("IA_Jump"),      EInputActionValueType::Boolean);
     IA_Sprint    = MakeAction(this, TEXT("IA_Sprint"),    EInputActionValueType::Boolean);
     IA_Dodge     = MakeAction(this, TEXT("IA_Dodge"),     EInputActionValueType::Boolean);
+    IA_Lens      = MakeAction(this, TEXT("IA_Lens"),      EInputActionValueType::Boolean);
+    IA_CmdHold   = MakeAction(this, TEXT("IA_CmdHold"),   EInputActionValueType::Boolean);
+    IA_CmdMove   = MakeAction(this, TEXT("IA_CmdMove"),   EInputActionValueType::Boolean);
+    IA_CmdBreach = MakeAction(this, TEXT("IA_CmdBreach"), EInputActionValueType::Boolean);
+    IA_CmdFollow = MakeAction(this, TEXT("IA_CmdFollow"), EInputActionValueType::Boolean);
+    IA_Interact  = MakeAction(this, TEXT("IA_Interact"),  EInputActionValueType::Boolean);
 
     auto Negate = [this](bool bX, bool bY) {
         UInputModifierNegate* M = NewObject<UInputModifierNegate>(this);
@@ -123,6 +179,18 @@ void ACSPlayerCharacter::BuildInputMapping()
     Mapping->MapKey(IA_Sprint, EKeys::Gamepad_LeftThumbstick);      // click LS
     Mapping->MapKey(IA_Dodge,  EKeys::LeftAlt);
     Mapping->MapKey(IA_Dodge,  EKeys::Gamepad_FaceButton_Right);    // B
+    Mapping->MapKey(IA_Lens,   EKeys::Q);
+    Mapping->MapKey(IA_Lens,   EKeys::Gamepad_LeftShoulder);        // hold LB
+    Mapping->MapKey(IA_CmdHold,   EKeys::One);
+    Mapping->MapKey(IA_CmdHold,   EKeys::Gamepad_DPad_Down);
+    Mapping->MapKey(IA_CmdMove,   EKeys::Two);
+    Mapping->MapKey(IA_CmdMove,   EKeys::Gamepad_DPad_Up);
+    Mapping->MapKey(IA_CmdBreach, EKeys::Three);
+    Mapping->MapKey(IA_CmdBreach, EKeys::Gamepad_DPad_Right);
+    Mapping->MapKey(IA_CmdFollow, EKeys::Four);
+    Mapping->MapKey(IA_CmdFollow, EKeys::Gamepad_DPad_Left);
+    Mapping->MapKey(IA_Interact,  EKeys::E);
+    Mapping->MapKey(IA_Interact,  EKeys::Gamepad_FaceButton_Top);   // Y
 }
 
 void ACSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -151,7 +219,53 @@ void ACSPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     EIC->BindAction(IA_Sprint,    ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnSprintStart);
     EIC->BindAction(IA_Sprint,    ETriggerEvent::Completed, this, &ACSPlayerCharacter::OnSprintStop);
     EIC->BindAction(IA_Dodge,     ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnDodge);
+    EIC->BindAction(IA_Lens,      ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnLensStart);
+    EIC->BindAction(IA_Lens,      ETriggerEvent::Completed, this, &ACSPlayerCharacter::OnLensStop);
+    EIC->BindAction(IA_CmdHold,   ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnCmdHold);
+    EIC->BindAction(IA_CmdMove,   ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnCmdMove);
+    EIC->BindAction(IA_CmdBreach, ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnCmdBreach);
+    EIC->BindAction(IA_CmdFollow, ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnCmdFollow);
+    EIC->BindAction(IA_Interact,  ETriggerEvent::Started,   this, &ACSPlayerCharacter::OnInteractStart);
+    EIC->BindAction(IA_Interact,  ETriggerEvent::Completed, this, &ACSPlayerCharacter::OnInteractStop);
 }
+
+// ------------------------------------------------------------------------------------
+void ACSPlayerCharacter::OnLensStart(const FInputActionValue&) { bLensUp = true;  if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->FireEvent(TEXT("lens_up")); }
+void ACSPlayerCharacter::OnLensStop(const FInputActionValue&)  { bLensUp = false; }
+
+void ACSPlayerCharacter::OnCmdHold(const FInputActionValue&)
+{
+    if (bDead || !bAimValid) return;
+    const FVector P = AimPoint;
+    OrderSquad([&](ACSSquadMate* M) { M->OrderHold(P); });
+    if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->FireEvent(TEXT("cmd_hold"));
+}
+void ACSPlayerCharacter::OnCmdMove(const FInputActionValue&)
+{
+    if (bDead || !bAimValid) return;
+    const FVector P = AimPoint;
+    OrderSquad([&](ACSSquadMate* M) { M->OrderMoveTo(P); });
+    if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->FireEvent(TEXT("cmd_move"));
+}
+void ACSPlayerCharacter::OnCmdBreach(const FInputActionValue&)
+{
+    if (bDead) return;
+    ACSBreachWall* W = AimWall.Get(); if (!W) return;
+    OrderSquad([&](ACSSquadMate* M) { M->OrderBreach(W); }, TEXT("mercer"));
+    if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->FireEvent(TEXT("cmd_breach"));
+}
+void ACSPlayerCharacter::OnCmdFollow(const FInputActionValue&)
+{
+    if (bDead) return;
+    OrderSquad([&](ACSSquadMate* M) { M->OrderFollow(); });
+    if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->FireEvent(TEXT("cmd_follow"));
+}
+void ACSPlayerCharacter::OnInteractStart(const FInputActionValue&)
+{
+    if (bDead) { if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->RestartFromCheckpoint(); return; }
+    bInteracting = true; InteractHeld = 0.f;
+}
+void ACSPlayerCharacter::OnInteractStop(const FInputActionValue&) { bInteracting = false; InteractHeld = 0.f; }
 
 // ------------------------------------------------------------------------------------
 void ACSPlayerCharacter::OnMove(const FInputActionValue& V)
@@ -184,7 +298,8 @@ void ACSPlayerCharacter::OnFire(const FInputActionValue&)
 {
     if (bDead)
     {
-        if (ACSGameMode* GM = GetWorld()->GetAuthGameMode<ACSGameMode>()) GM->RequestRestart();
+        if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->RestartFromCheckpoint();
+        else if (ACSGameMode* GM = GetWorld()->GetAuthGameMode<ACSGameMode>()) GM->RequestRestart();
         return;
     }
     if (bReloading || !ProjectileClass) return;
@@ -194,6 +309,8 @@ void ACSPlayerCharacter::OnFire(const FInputActionValue&)
     if (Now - LastFireTime < FireInterval) return;
     LastFireTime = Now;
     AmmoInMag--;
+    if (AmmoInMag == 5 && AmmoReserve > 0) if (UCSDialogueSubsystem* Dlg = GetWorld()->GetSubsystem<UCSDialogueSubsystem>()) Dlg->Bark(TEXT("low_ammo"), 20.f);
+    if (AmmoInMag == 0 && AmmoReserve == 0) if (UCSDialogueSubsystem* Dlg = GetWorld()->GetSubsystem<UCSDialogueSubsystem>()) Dlg->Bark(TEXT("no_ammo"), 20.f);
 
     // Spawn along the camera's aim so the projectile goes where the crosshair is.
     const FRotator Aim = GetControlRotation();
@@ -228,7 +345,8 @@ void ACSPlayerCharacter::OnJumpStart(const FInputActionValue&)
 {
     if (bDead)
     {
-        if (ACSGameMode* GM = GetWorld()->GetAuthGameMode<ACSGameMode>()) GM->RequestRestart();
+        if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->RestartFromCheckpoint();
+        else if (ACSGameMode* GM = GetWorld()->GetAuthGameMode<ACSGameMode>()) GM->RequestRestart();
         return;
     }
     Jump();
@@ -259,7 +377,9 @@ float ACSPlayerCharacter::TakeDamage(float DamageAmount, FDamageEvent const& Dam
     if (bDead) return 0.f;
     const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
     Health = FMath::Clamp(Health - Applied, 0.f, MaxHealth);
+    LastDamageTime = GetWorld()->GetTimeSeconds();
     if (Health <= 0.f) Die();
+    else if (Health < MaxHealth * 0.3f) if (UCSDialogueSubsystem* Dlg = GetWorld()->GetSubsystem<UCSDialogueSubsystem>()) Dlg->Bark(TEXT("player_low"), 10.f);
     return Applied;
 }
 
@@ -267,5 +387,6 @@ void ACSPlayerCharacter::Die()
 {
     bDead = true;
     GetCharacterMovement()->DisableMovement();
+    if (ACSMissionDirector* D = ACSMissionDirector::Get(this)) D->Fail(NSLOCTEXT("CS", "PlayerDown", "Ward is down."));
     if (ACSGameMode* GM = GetWorld()->GetAuthGameMode<ACSGameMode>()) GM->OnPlayerDied();
 }

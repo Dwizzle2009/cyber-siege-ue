@@ -1,6 +1,7 @@
 #include "CSGameMode.h"
 #include "CSPlayerCharacter.h"
-#include "CSEnemy.h"
+#include "AI/CSEnemy.h"
+#include "Mission/CSMissionDirector.h"
 #include "CSHUD.h"
 #include "AeonSDKSubsystem.h"
 #include "CyberSiege.h"
@@ -21,6 +22,8 @@ void ACSGameMode::BeginPlay()
     // Tell the platform we're playing -- friends see "Playing Cyber Siege" on their consoles.
     if (UAeonSDKSubsystem* Aeon = GetGameInstance()->GetSubsystem<UAeonSDKSubsystem>()) Aeon->SetPresence(TEXT("In the arena"));
 
+    bMissionMode = ACSMissionDirector::Get(this) != nullptr;
+    if (bMissionMode) return;   // the mission director and wave director run the show
     StatusText = TEXT("SYSTEMS ONLINE");
     GetWorldTimerManager().SetTimer(NextWaveTimer, this, &ACSGameMode::StartWave, 1.5f, false);
 }
@@ -63,9 +66,15 @@ void ACSGameMode::SpawnOneEnemy()
     }
 }
 
-void ACSGameMode::RegisterEnemyKill(AActor*, int32 Points)
+void ACSGameMode::RegisterEnemyKill(AActor*, int32 Points, AController* Killer)
 {
     Kills++;
+    if (bMissionMode)
+    {
+        // Mission kills count for achievements only; no score, no waves from here.
+        if (Kills == 1) if (UAeonSDKSubsystem* Aeon = GetGameInstance()->GetSubsystem<UAeonSDKSubsystem>()) Aeon->UnlockAchievement(TEXT("first_kill"));
+        return;
+    }
     Score += Points * FMath::Max(1, Wave);
     EnemiesAlive = FMath::Max(0, EnemiesAlive - 1);
 
@@ -81,6 +90,7 @@ void ACSGameMode::OnPlayerDied()
 {
     if (bGameOver) return;
     bGameOver = true;
+    if (bMissionMode) return;   // the HUD shows the mission's fail card; interact restarts from the checkpoint
     GetWorldTimerManager().ClearTimer(SpawnTimer);
     GetWorldTimerManager().ClearTimer(NextWaveTimer);
     StatusText = FString::Printf(TEXT("SYSTEM BREACH\nWAVE %d   SCORE %06d\n\nFIRE / A  TO REBOOT"), Wave, Score);
