@@ -515,7 +515,11 @@ sky.set_actor_label("SkyLight"); sky.light_component.set_editor_property("real_t
 sky.light_component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
 atmo = eas.spawn_actor_from_class(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)); atmo.set_actor_label("SkyAtmosphere")
 fog = eas.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)); fog.set_actor_label("HeightFog")
-fog.component.set_editor_property("fog_density", 0.02); fog.component.set_editor_property("volumetric_fog", True)
+fog.component.set_editor_property("fog_density", 0.02)
+try:
+    fog.component.set_editor_property("volumetric_fog", True)   # property name moved in 5.8; the fog is fine without it
+except Exception:
+    pass
 ppv = eas.spawn_actor_from_class(unreal.PostProcessVolume, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
 ppv.set_actor_label("PostProcess_Global"); ppv.set_editor_property("unbound", True)
 # the base is night: a point light over the aid tent
