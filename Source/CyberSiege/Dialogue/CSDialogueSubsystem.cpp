@@ -66,7 +66,7 @@ bool UCSDialogueSubsystem::Bark(FName Trigger, float Cooldown)
     if (Variants.Num() == 0) return false;
     const FCSDialogueLine* Pick = Variants[FMath::RandHelper(Variants.Num())];
     BarkCooldownUntil.Add(Trigger, Now + Cooldown);
-    Active = { Pick->Speaker, Pick->Text, Now + DurationFor(*Pick), true };
+    Active = { Pick->Speaker, Pick->Text, (float)(Now + DurationFor(*Pick)), true };
     if (USoundBase* S = Pick->Voice.LoadSynchronous()) UGameplayStatics::PlaySound2D(this, S);
     return true;
 }
@@ -74,7 +74,7 @@ bool UCSDialogueSubsystem::Bark(FName Trigger, float Cooldown)
 void UCSDialogueSubsystem::Start(const FQueued& Q)
 {
     const FCSDialogueLine& L = *Q.Line;
-    Active = { L.Speaker, L.Text, GetWorld()->GetTimeSeconds() + DurationFor(L), false };
+    Active = { L.Speaker, L.Text, (float)GetWorld()->GetTimeSeconds() + DurationFor(L), false };
     if (USoundBase* S = L.Voice.LoadSynchronous()) UGameplayStatics::PlaySound2D(this, S);
     UE_LOG(LogCyberSiege, Verbose, TEXT("[DIALOGUE] %s: %s"), *L.Speaker.ToString(), *L.Text.ToString());
 }
