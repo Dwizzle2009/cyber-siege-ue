@@ -121,6 +121,17 @@ def player_start(name, loc, yaw, tag):
     a.set_actor_label(name); a.set_editor_property("player_start_tag", tag)
     return a
 
+def light(name, loc, intensity=5000.0, radius=1800.0, color=(1.0, 0.96, 0.9)):
+    """A work light: the gray-box has no windows, so every enclosed space gets one."""
+    a = eas.spawn_actor_from_class(unreal.PointLight, unreal.Vector(*loc), unreal.Rotator(0, 0, 0))
+    a.set_actor_label(name)
+    c = a.point_light_component
+    c.set_intensity(intensity); c.set_editor_property("attenuation_radius", radius)
+    c.set_light_color(unreal.LinearColor(color[0], color[1], color[2], 1.0))
+    c.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
+    c.set_editor_property("cast_shadows", False)
+    return a
+
 GZ = 0.0  # ground
 
 # ============================================================================ COURTYARD (x 0..3000)
@@ -134,6 +145,9 @@ box("Vehicle_Door", (50, 0, GZ + 125), (10, 260, 250), M_WRECK, tags=["vehicle_d
 box("Arcade_Roof", (1500, -1300, GZ + 330), (3000, 400, 30), M_WALL)
 for i in range(6):
     box(f"Arcade_Col_{i}", (300 + i * 480, -1120, GZ + 165), (40, 40, 330), M_WALL)
+light("Light_Vehicle", (-200, 0, GZ + 230), 1500, 500, (1.0, 0.7, 0.5))
+light("Light_Arcade_a", (700, -1300, GZ + 300), 3000, 1200)
+light("Light_Arcade_b", (2300, -1300, GZ + 300), 3000, 1200)
 box("Court_Wall_N", (1500, 1800, GZ + 250), (3000, 40, 500), M_WALL)
 box("Court_Wall_S", (1500, -1800, GZ + 250), (3000, 40, 500), M_WALL)
 box("Court_Wall_W", (-600, 0, GZ + 250), (40, 3600, 500), M_WALL)
@@ -207,6 +221,12 @@ for f in range(1, 6):
             box(f"Block_Int_{f}_{side}_{i}", (x0 + 150, y, z), (300, 20, FH), M_WALL)   # wall segment, 200 cm gap = a door
     # a cover block in the corridor
     cover_block(f"Block_Cover_{f}", (BX0 + 1200, 0, GZ + f * FH + 50), (120, 200, 100), 0)
+    # work lights: corridor, both apartment rows, the stairwell
+    light(f"Light_Block_{f}_a", (BX0 + 600, 0, GZ + f * FH + FH - 60), 4000, 1400)
+    light(f"Light_Block_{f}_b", (BX0 + 1500, 0, GZ + f * FH + FH - 60), 4000, 1400)
+    light(f"Light_Block_{f}_n", (CX, 700, GZ + f * FH + FH - 60), 3000, 1200, (0.9, 0.95, 1.0))
+    light(f"Light_Block_{f}_s", (CX, -700, GZ + f * FH + FH - 60), 3000, 1200, (0.9, 0.95, 1.0))
+    light(f"Light_Stair_{f}", (3400, -1000, GZ + f * FH + FH - 60), 2500, 900, (1.0, 0.85, 0.6))
 # floor 3 -> 4 : balcony on the north face, ramp up outside
 box("Balcony_3", (CX, BY1 + 200, GZ + 3 * FH - 15), (1400, 400, 30), M_FLOOR)
 box("Balcony_Rail", (CX, BY1 + 400, GZ + 3 * FH + 50), (1400, 20, 100), M_WALL)
@@ -254,6 +274,7 @@ spawn_pt("Spawn_StreetFlank_1", (7200, 200, GZ + 10), "street_flank")
 box("Pharmacy", (6400, -1900, GZ + 200), (1200, 600, 400), M_WALL)
 box("Dock", (7100, -1900, GZ + 60), (600, 600, 120), M_FLOOR)
 box("Dock_Wall", (7100, -2250, GZ + 260), (600, 30, 400), M_WALL)
+light("Light_Dock", (7100, -1900, GZ + 380), 3000, 1200)
 cover_block("Dock_Crate_0", (6900, -1700, GZ + 60), (160, 160, 120), 270)
 cover_block("Dock_Crate_1", (7300, -1750, GZ + 60), (160, 160, 120), 270)
 spawn_pt("Spawn_Dock_0", (7000, -2000, GZ + 130), "dock")
@@ -275,6 +296,8 @@ box("Heli_Side_N", (8600, 160, GZ + 165), (900, 20, 310), M_WRECK)
 box("Heli_Side_S", (8600, -160, GZ + 165), (900, 20, 310), M_WRECK)
 box("Heli_Back", (9050, 0, GZ + 165), (20, 320, 310), M_WRECK)
 box("Heli_Panel", (8520, -60, GZ + 80), (60, 120, 120), M_WRECK)   # the instrument panel on Reyes's legs
+light("Light_Cabin", (8400, 0, GZ + 280), 2500, 700, (1.0, 0.6, 0.4))   # emergency light in the cabin
+light("Light_Wreck", (8600, 0, GZ + 700), 6000, 2500)
 box("Heli_Tail", (9300, 60, GZ + 220), (700, 120, 120), M_WRECK)
 box("Heli_Rotor", (8600, -200, GZ + 330), (1400, 60, 20), M_WRECK, rot=(0, 20, 0))
 spot("Spot_CabinDoor", (8100, 0, GZ), 180, ["cabin_door"])
@@ -318,6 +341,8 @@ for i in range(4):
     box(f"ParkingDeck_S_Col_{i}", (8100 + i * 330, -3300, GZ + 250), (60, 60, 500), M_WALL)
     box(f"ParkingDeck_S_Col2_{i}", (8100 + i * 330, -4300, GZ + 250), (60, 60, 500), M_WALL)
 box("Rubble_Collapse", (8600, -3500, GZ + 200), (1200, 300, 400), M_WALL, tags=["rubble"], hidden=True)
+light("Light_Parking_a", (8600, -3500, GZ + 440), 4000, 1400, (0.85, 0.9, 1.0))
+light("Light_Parking_b", (8600, -4100, GZ + 440), 4000, 1400, (0.85, 0.9, 1.0))
 t_event("Trig_Parking", (8600, -3200, GZ + 150), (600, 200, 150), "parking", "extraction")
 t_event("Trig_Collapse", (8600, -4300, GZ + 150), (600, 200, 150), "collapse", "extraction")
 box("Ground_Yard", (8600, -5600, GZ - 25), (3000, 2200, 50), M_GROUND)
@@ -331,6 +356,7 @@ for i in range(3):
             box("Container_Shelter_S", (x, y - 150, GZ + 130), (600, 20, 260), M_COVER)
             box("Container_Shelter_Top", (x, y, GZ + 270), (600, 300, 20), M_COVER)
             spot("Spot_Container", (x, y, GZ), 90, ["container"])
+            light("Light_Container", (x, y, GZ + 230), 1500, 500, (1.0, 0.8, 0.6))
             cover("Container_Door_cp", (x, y + 200, GZ), 90)
         else:
             cover_block(f"Container_{i}_{j}", (x, y, GZ + 130), (600, 300, 260), 90)
@@ -512,6 +538,7 @@ sun.light_component.set_light_color(unreal.LinearColor(1.0, 0.93, 0.85, 1.0))
 sun.light_component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
 sky = eas.spawn_actor_from_class(unreal.SkyLight, unreal.Vector(0, 0, 2000), unreal.Rotator(0, 0, 0))
 sky.set_actor_label("SkyLight"); sky.light_component.set_editor_property("real_time_capture", True)
+sky.light_component.set_intensity(2.0)
 sky.light_component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
 atmo = eas.spawn_actor_from_class(unreal.SkyAtmosphere, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)); atmo.set_actor_label("SkyAtmosphere")
 fog = eas.spawn_actor_from_class(unreal.ExponentialHeightFog, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0)); fog.set_actor_label("HeightFog")
@@ -522,10 +549,19 @@ except Exception:
     pass
 ppv = eas.spawn_actor_from_class(unreal.PostProcessVolume, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
 ppv.set_actor_label("PostProcess_Global"); ppv.set_editor_property("unbound", True)
+pps = ppv.get_editor_property("settings")
+# auto exposure can't dive into darkness: a floor on how dark the scene is allowed to render
+pps.set_editor_property("override_auto_exposure_min_brightness", True); pps.set_editor_property("auto_exposure_min_brightness", 0.6)
+pps.set_editor_property("override_auto_exposure_max_brightness", True); pps.set_editor_property("auto_exposure_max_brightness", 4.0)
+pps.set_editor_property("override_auto_exposure_bias", True); pps.set_editor_property("auto_exposure_bias", 1.0)
+ppv.set_editor_property("settings", pps)
 # the base is night: a point light over the aid tent
 pl = eas.spawn_actor_from_class(unreal.PointLight, unreal.Vector(BXB - 800, 600, 450), unreal.Rotator(0, 0, 0))
 pl.set_actor_label("Base_Light"); pl.point_light_component.set_intensity(8000.0)
 pl.point_light_component.set_editor_property("mobility", unreal.ComponentMobility.MOVABLE)
+light("Light_Base_Yard", (BXB + 600, -600, 450), 6000, 2200, (1.0, 0.9, 0.75))
+light("Light_Base_Terminal", (BXB + 600, 600, 350), 3000, 1200, (0.7, 0.85, 1.0))
+light("Light_Base_Bunk", (BXB - 900, -900, 350), 2500, 1000, (1.0, 0.8, 0.6))
 
 les.save_current_level()
 
