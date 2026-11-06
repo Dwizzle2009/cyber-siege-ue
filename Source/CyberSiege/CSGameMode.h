@@ -19,6 +19,11 @@ public:
     void OnPlayerDied();
     void RequestRestart();
 
+    /** The console's Guide now covers the game: pause, and give the GPU back so the overlay stays smooth (30 fps, half-res). */
+    UFUNCTION() void OnAeonGuideOpened();
+    /** The Guide went away: back to full speed. */
+    UFUNCTION() void OnAeonGuideClosed();
+
     // read by the HUD
     int32 Wave = 0;
     int32 Score = 0;

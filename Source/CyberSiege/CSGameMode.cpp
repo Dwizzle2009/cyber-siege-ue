@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 
 ACSGameMode::ACSGameMode()
 {
@@ -20,7 +21,12 @@ void ACSGameMode::BeginPlay()
 {
     Super::BeginPlay();
     // Tell the platform we're playing -- friends see "Playing Cyber Siege" on their consoles.
-    if (UAeonSDKSubsystem* Aeon = GetGameInstance()->GetSubsystem<UAeonSDKSubsystem>()) Aeon->SetPresence(TEXT("In the arena"));
+    if (UAeonSDKSubsystem* Aeon = GetGameInstance()->GetSubsystem<UAeonSDKSubsystem>())
+    {
+        Aeon->SetPresence(TEXT("In the arena"));
+        Aeon->OnGuideOpened.AddDynamic(this, &ACSGameMode::OnAeonGuideOpened);
+        Aeon->OnGuideClosed.AddDynamic(this, &ACSGameMode::OnAeonGuideClosed);
+    }
 
     bMissionMode = ACSMissionDirector::Get(this) != nullptr;
     if (bMissionMode) return;   // the mission director and wave director run the show
@@ -106,3 +112,26 @@ void ACSGameMode::RequestRestart()
 }
 
 void ACSGameMode::ClearStatus() { StatusText.Empty(); }
+
+// The Guide: the game pauses (the mission clock, dialogue and enemies all stop with it) and renders cheaply --
+// a paused frame at 30 fps and half resolution -- so the console's overlay has the GPU to itself. The same thing
+// Xbox does to a game behind its Guide. Everything comes back the moment the Guide closes.
+void ACSGameMode::OnAeonGuideOpened()
+{
+    UGameplayStatics::SetGamePaused(this, true);
+    if (GEngine)
+    {
+        GEngine->Exec(GetWorld(), TEXT("t.MaxFPS 30"));
+        GEngine->Exec(GetWorld(), TEXT("r.ScreenPercentage 50"));
+    }
+}
+
+void ACSGameMode::OnAeonGuideClosed()
+{
+    if (GEngine)
+    {
+        GEngine->Exec(GetWorld(), TEXT("r.ScreenPercentage 100"));
+        GEngine->Exec(GetWorld(), TEXT("t.MaxFPS 0"));
+    }
+    UGameplayStatics::SetGamePaused(this, false);
+}
